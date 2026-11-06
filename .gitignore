@@ -1,0 +1,5 @@
+# backups made while editing
+*.bak
+*.bak-*
+# machine-local: debug adapter binaries (netcoredbg), see ide.el
+debug-adapters/
