@@ -5,18 +5,23 @@
 
 ;;; ── Helpers ──────────────────────────────────────────────────────────────
 
-(defun +my/window-or-herdr (dir)
-  "Select the window in DIR; at an edge, focus the adjacent herdr pane.
-Mirrors nav_or_herdr in nvim's keymaps.lua (only meaningful in a terminal).
-Reaches `no-other-window' windows too (treemacs sets it, so windmove would
-otherwise skip the tree and fall through to herdr)."
-  (condition-case nil
-      (let ((windmove-allow-all-windows t))
-        (windmove-do-window-select dir))
-    (user-error
-     (when (and (not (display-graphic-p)) (executable-find "herdr"))
-       (call-process "herdr" nil 0 nil
-                     "pane" "focus" "--direction" (symbol-name dir))))))
+(defun +my/window-move (dir)
+  "Select the window in DIR, including `no-other-window' ones (treemacs sets
+it, so plain windmove would skip the file tree)."
+  (let ((windmove-allow-all-windows t))
+    (ignore-errors (windmove-do-window-select dir))))
+
+;; vterm needs a compiled module that doesn't build on Windows; there the
+;; terminal is eshell (Doom's :term eshell). Same keys either way.
+(defun +my/term-toggle (&optional arg)
+  "Toggle the terminal popup for this workspace."
+  (interactive "P")
+  (if (featurep :system 'windows) (+eshell/toggle arg) (+vterm/toggle arg)))
+
+(defun +my/term-here (&optional arg)
+  "Open a terminal in the current window."
+  (interactive "P")
+  (if (featurep :system 'windows) (+eshell/here arg) (+vterm/here arg)))
 
 (defun +my/buffer-prev ()
   "Previous buffer, in tab-bar order when centaur-tabs is on (bufferline)."
@@ -294,17 +299,17 @@ have to dispatch on the mode instead."
       :n "[B" #'centaur-tabs-move-current-tab-to-left
       :n "]B" #'centaur-tabs-move-current-tab-to-right)
 
-;; <C-h/j/k/l>: move between windows, falling through to herdr panes.
+;; <C-h/j/k/l>: move between windows.
 ;; In the override map so it also works in magit, dired, help buffers...
 (map! :map general-override-mode-map
-      :nm "C-h" (cmd! (+my/window-or-herdr 'left))
-      :nm "C-j" (cmd! (+my/window-or-herdr 'down))
-      :nm "C-k" (cmd! (+my/window-or-herdr 'up))
-      :nm "C-l" (cmd! (+my/window-or-herdr 'right)))
+      :nm "C-h" (cmd! (+my/window-move 'left))
+      :nm "C-j" (cmd! (+my/window-move 'down))
+      :nm "C-k" (cmd! (+my/window-move 'up))
+      :nm "C-l" (cmd! (+my/window-move 'right)))
 (after! treemacs-evil
   (map! :map evil-treemacs-state-map
-        "C-h" (cmd! (+my/window-or-herdr 'left))
-        "C-l" (cmd! (+my/window-or-herdr 'right))))
+        "C-h" (cmd! (+my/window-move 'left))
+        "C-l" (cmd! (+my/window-move 'right))))
 
 ;; <C-arrows>: resize windows.
 (map! :n "C-<up>"    #'evil-window-increase-height
@@ -316,14 +321,20 @@ have to dispatch on the mode instead."
 (map! :nvi "C-'" #'+my/claude-toggle)
 (after! vterm
   (map! :map vterm-mode-map "C-'" #'+my/claude-toggle))
+(after! eat
+  (map! :map eat-mode-map "C-'" #'+my/claude-toggle))
 
 ;; <C-/>: toggle the terminal from anywhere (insert/terminal included).
-(map! :nvi "C-/" #'+vterm/toggle
-      :nvi "C-_" #'+vterm/toggle)
+(map! :nvi "C-/" #'+my/term-toggle
+      :nvi "C-_" #'+my/term-toggle)
 (after! vterm
   (map! :map vterm-mode-map
-        "C-/" #'+vterm/toggle
-        "C-_" #'+vterm/toggle))
+        "C-/" #'+my/term-toggle
+        "C-_" #'+my/term-toggle))
+(after! eshell
+  (map! :map eshell-mode-map
+        :nvi "C-/" #'+my/term-toggle
+        :nvi "C-_" #'+my/term-toggle))
 
 
 ;;; ── LSP / diagnostics (lsp-mode buffers) ─────────────────────────────────
@@ -452,8 +463,8 @@ have to dispatch on the mode instead."
        :desc "New file"                 "n" #'evil-buffer-new
        :desc "Projects"                 "p" #'projectile-switch-project
        :desc "Recent files (project)"   "R" #'projectile-recentf
-       :desc "Terminal (popup)"         "t" #'+vterm/toggle
-       :desc "Terminal (here)"          "T" #'+vterm/here)
+       :desc "Terminal (popup)"         "t" #'+my/term-toggle
+       :desc "Terminal (here)"          "T" #'+my/term-here)
 
       (:prefix "s"
        :desc "Registers"                "\"" #'consult-register
@@ -542,7 +553,7 @@ have to dispatch on the mode instead."
        :desc "Org: save src / Task list" "w"
        (general-predicate-dispatch #'+my/compilation-buffer
          (bound-and-true-p org-src-mode) #'org-edit-src-save)
-       :desc "Org: tags / Terminal"     "t" (+my/in-org #'org-set-tags-command #'+vterm/toggle)
+       :desc "Org: tags / Terminal"     "t" (+my/in-org #'org-set-tags-command #'+my/term-toggle)
        :desc "Org: archive tag / Agenda" "A" (+my/in-org #'org-toggle-archive-tag #'org-agenda)
        :desc "Org: priority"            "," (+my/in-org #'org-priority)
        :desc "Org: toggle heading"      "*" (+my/in-org #'org-toggle-heading)

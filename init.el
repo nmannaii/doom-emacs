@@ -81,10 +81,11 @@
        vc                ; version-control and Emacs, sitting in a tree
 
        :term
-       ;;eshell            ; the elisp shell that works everywhere
+       eshell            ; the elisp shell that works everywhere (the terminal on Windows)
        ;;shell             ; simple shell REPL for Emacs
        ;;term              ; basic terminal emulator for Emacs
-       vterm             ; the best terminal emulation in Emacs
+       (:if (not (featurep :system 'windows))
+        vterm)           ; the best terminal emulation in Emacs (no Windows build)
 
        :checkers
        syntax              ; tasing you for every semicolon you forget

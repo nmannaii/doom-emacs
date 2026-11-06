@@ -65,3 +65,5 @@
 (package! evil-textobj-tree-sitter
   :recipe (:host github :repo "meain/evil-textobj-tree-sitter"
            :files (:defaults "queries" "treesit-queries")))
+;; Pure-elisp terminal: Claude Code's terminal on Windows, where vterm can't build.
+(package! eat)

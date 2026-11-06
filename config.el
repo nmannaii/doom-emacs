@@ -132,11 +132,15 @@
 (load! "ide")
 
 ;; A GUI Emacs started from the desktop doesn't get the shell's PATH, so add
-;; what nvim finds through the shell: nvm's node (mmdc, ngserver), herdr,
-;; dotnet tools.
+;; where the tools live: node (mmdc, ngserver), claude, dotnet tools (Roslyn).
 (dolist (dir (append (last (file-expand-wildcards "~/.nvm/versions/node/*/bin"))
                      (list (expand-file-name "~/.local/bin")
-                           (expand-file-name "~/.dotnet/tools"))))
+                           (expand-file-name "~/.dotnet/tools"))
+                     (when (featurep :system 'windows)
+                       (delq nil (list (and (getenv "APPDATA")
+                                            (expand-file-name "npm" (getenv "APPDATA")))
+                                       (and (getenv "ProgramFiles")
+                                            (expand-file-name "nodejs" (getenv "ProgramFiles"))))))))
   (when (and (file-directory-p dir) (not (member dir exec-path)))
     (add-to-list 'exec-path dir)
     (setenv "PATH" (concat dir path-separator (getenv "PATH")))))

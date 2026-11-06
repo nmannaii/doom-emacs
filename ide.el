@@ -17,9 +17,11 @@
 ;;                      started with `pm run' / `dotnet run')
 
 (defun +my/netcoredbg-command ()
-  (let ((local (expand-file-name "netcoredbg/netcoredbg"
-                                 (doom-user-dir "debug-adapters/"))))
-    (if (file-executable-p local) local "netcoredbg")))
+  ;; locate-file adds .exe on Windows.
+  (or (locate-file "netcoredbg"
+                   (list (expand-file-name "netcoredbg" (doom-user-dir "debug-adapters/")))
+                   exec-suffixes 1)
+      "netcoredbg"))
 
 (defun +my/dotnet-pick-csproj ()
   "Pick a .csproj under the project (the current buffer's own first)."
@@ -227,7 +229,8 @@
              claude-code-ide-insert-at-mentioned claude-code-ide-list-sessions
              claude-code-ide-continue claude-code-ide-resume claude-code-ide-stop)
   :init
-  (setq claude-code-ide-terminal-backend 'vterm
+  (setq claude-code-ide-terminal-backend
+        (if (featurep :system 'windows) 'eat 'vterm)   ; no vterm on Windows
         claude-code-ide-show-backend-recommendation nil
         claude-code-ide-window-side 'right
         claude-code-ide-window-width 100)
@@ -245,7 +248,7 @@
   (evil-define-minor-mode-key 'insert '+my/claude-term-mode
     (kbd "<escape>")   #'claude-code-ide-send-escape
     (kbd "C-<escape>") #'evil-normal-state))
-(add-hook! 'vterm-mode-hook
+(add-hook! '(vterm-mode-hook eat-mode-hook)
   (defun +my/claude-term-h ()
     (when (string-prefix-p "*claude-code[" (buffer-name))
       (+my/claude-term-mode +1)
@@ -256,12 +259,15 @@
 ;; With `+my/claude-ask-account' (the default) it asks, offering that one first.
 (defvar +my/claude-ask-account t
   "Non-nil: ask which account each new Claude uses.")
-(defvar +my/claude-accounts '("claude-work" "claude-personal"))
+;; The two wrappers only exist on the Linux machine; elsewhere it's `claude'.
+(defvar +my/claude-accounts
+  (if (executable-find "claude-work") '("claude-work" "claude-personal") '("claude")))
 (defvar +my/claude-account-rules
-  '(("~/projects/" . "claude-personal")
-    ("~/.config/"  . "claude-personal"))
+  (when (cdr +my/claude-accounts)
+    '(("~/projects/" . "claude-personal")
+      ("~/.config/"  . "claude-personal")))
   "(FOLDER . COMMAND) pairs; projects under FOLDER use COMMAND.")
-(defvar +my/claude-default-account "claude-work")
+(defvar +my/claude-default-account (car +my/claude-accounts))
 
 (defun +my/claude-account ()
   "The account for a new Claude: asked, or picked from the folder rules."
@@ -269,7 +275,7 @@
          (usual (or (cdr (seq-find (lambda (rule) (file-in-directory-p dir (car rule)))
                                    +my/claude-account-rules))
                     +my/claude-default-account)))
-    (if +my/claude-ask-account
+    (if (and +my/claude-ask-account (cdr +my/claude-accounts))   ; a choice to make
         (completing-read (format "Claude account (default %s): " usual)
                          (cons usual (remove usual +my/claude-accounts))
                          nil t nil nil usual)
